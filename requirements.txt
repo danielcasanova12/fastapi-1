@@ -1,1 +1,7 @@
 fastapi[all]
+torch==2.4.1
+torchaudio==2.4.1
+torchvision==0.19.1
+pillow==10.4.0
+uvicorn==0.31.0
+gunicorn==23.0.0
