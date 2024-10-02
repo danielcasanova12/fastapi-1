@@ -1,21 +1,13 @@
-from typing import Optional
+from fastapi import FastAPI, File, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi import FastAPI
-
-# Inicializar FastAPI
-
 from PIL import Image
-import sys
-import os
+from io import BytesIO
 import torch
 import torchvision.transforms as transforms
-from io import BytesIO
 
 from resnet_modelv2 import CustomResNet50
 
-
 app = FastAPI()
-
 
 # Configurar CORS para liberar todas as origens
 app.add_middleware(
@@ -33,13 +25,13 @@ classes = ['anger', 'contempt', 'disgust', 'fear', 'happy', 'neutral', 'sad', 's
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 # Carregar o modelo treinado (ajustar conforme sua arquitetura)
-modelo_treinado = CustomResNet50(8).get_model()  # Obtenha seu modelo aqui
-modelo_treinado.load_state_dict(torch.load('./model2affectnet.pt', map_location=device))  # Carregar pesos
+modelo_treinado = CustomResNet50(8).get_model()
+modelo_treinado.load_state_dict(torch.load('./model2affectnet.pt', map_location=device))
 modelo_treinado.eval()  # Colocar o modelo em modo de avaliação
 modelo_treinado.to(device)
 
 # Definir transformações da imagem
-image_size = 224  # Ajustar conforme necessário
+image_size = 224
 transformacao = transforms.Compose([
     transforms.Resize(image_size),
     transforms.CenterCrop(image_size),
@@ -49,22 +41,23 @@ transformacao = transforms.Compose([
 
 # Função para prever a emoção
 def prever_emocao(image: Image.Image):
-    # Aplicar transformações na imagem
     imagem_transformada = transformacao(image).unsqueeze(0).to(device)
-    
-    # Fazer predição
     with torch.no_grad():
         saida = modelo_treinado(imagem_transformada)
         _, pred = torch.max(saida, 1)
         emocao_predita = classes[pred.item()]
-    
     return emocao_predita
 
-
+# Endpoint raiz
 @app.get("/")
 async def root():
     return {"message": "Hello World222"}
 
-@app.get("/items/{item_id}")
-def read_item(item_id: int, q: Optional[str] = None):
-    return {"item_id": item_id, "q": q}
+# Endpoint para upload de imagem e previsão de emoção
+@app.post("/upload_image")
+async def upload_image(file: UploadFile = File(...)):
+    # Ler o arquivo de imagem e fazer a predição
+    image = Image.open(BytesIO(await file.read()))
+    emotion = prever_emocao(image)
+    
+    return {"emocao": emotion}
