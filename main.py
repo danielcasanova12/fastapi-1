@@ -16,6 +16,7 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],  # Permitir todos os métodos (GET, POST, PUT, DELETE, etc.)
     allow_headers=["*"],  # Permitir todos os cabeçalhos
+    expose_headers=["*"],  # Expor todos os cabeçalhos
 )
 
 # Definir as classes de emoção
@@ -24,7 +25,7 @@ classes = ['anger', 'contempt', 'disgust', 'fear', 'happy', 'neutral', 'sad', 's
 # Definir o dispositivo para execução (CPU ou GPU)
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-# Carregar o modelo treinado
+# Carregar o modelo treinado (ajustar conforme sua arquitetura)
 modelo_treinado = CustomResNet50(8).get_model()
 modelo_treinado.load_state_dict(torch.load('./model2affectnet.pt', map_location=device))
 modelo_treinado.eval()  # Colocar o modelo em modo de avaliação
@@ -41,11 +42,6 @@ transformacao = transforms.Compose([
 
 # Função para prever a emoção
 def prever_emocao(image: Image.Image):
-    # Converter para RGB se a imagem tiver 4 canais (RGBA)
-    if image.mode == 'RGBA':
-        image = image.convert('RGB')
-    
-    # Aplicar as transformações e fazer a predição
     imagem_transformada = transformacao(image).unsqueeze(0).to(device)
     with torch.no_grad():
         saida = modelo_treinado(imagem_transformada)
@@ -65,9 +61,13 @@ async def upload_image(file: UploadFile = File(...)):
         # Ler o arquivo de imagem e fazer a predição
         image = Image.open(BytesIO(await file.read()))
 
-        # Verificar se a imagem é RGBA e converter para RGB
+        # Garantir que a imagem seja convertida para RGB
+        if image.mode != 'RGB':
+            image = image.convert('RGB')
+
         emotion = prever_emocao(image)
         return {"emocao": emotion}
+    
     except UnidentifiedImageError:
         return {"error": "O arquivo enviado não é uma imagem válida."}
     except Exception as e:
